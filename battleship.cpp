@@ -58,7 +58,7 @@ int main() {
     };
 
     printBoard(boardPlayer1, player1); // Print Player 1 Board 
-    //printBoard(boardPlayer2, player2); // Print Player 1 Board 
+    //printBoard(boardPlayer2, player2); // Print Player 2 Board 
 
     return 0;
 }
