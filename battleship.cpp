@@ -39,6 +39,7 @@ int battleship1[4][2][2]; // USER Battleship Ship - 4 Holes
 int cruiser1[3][2][2]; // USER Cruiser Ship - 3 Holes
 int submarine1[3][2][2]; // USER Submarine Ship - 3 Holes
 int destroyer1[1][2][2]; // USER Destroyer Ship - 2 Holes
+bool huntMode1 = false;
 
 // AI Battle Ships
 int carrier2[5][2][2]; // AI Carrier Ship -4 Holes
@@ -46,6 +47,7 @@ int battleship2[4][2][2]; // AI Battleship Ship - 4 Holes
 int cruiser2[3][2][2]; // AI Cruiser Ship - 3 Holes
 int submarine2[3][2][2]; // AI Submarine Ship - 3 Holes
 int destroyer2[1][2][2]; // AI Destroyer Ship - 2 Holes
+bool huntMode2 = false;
 
 // A Node In The Monte Carlo Search Tree
 // Each Node Represents A Specific Board Configuration 
@@ -93,7 +95,8 @@ double UCB(MCTSNode* node); // Our UCB Score For Child Node Selection
 
 void parallelSimulation(vector<MCTSNode*>& nodes);
 
-void huntAndTarget(char board[10][10], int row, col); // "Lock on" to a HIT space and scan around it
+bool bombed(char board[10][10], int row, int col); // Has the space been bombed yet?
+void huntAndTarget(char board[10][10], int row, int col); // "Lock on" to a HIT space and scan around it
 
 //// MAIN Function ////
 
@@ -405,7 +408,7 @@ vector<pair<int, int>> getPossibleMoves(const char board[10][10]) {
     vector<pair<int, int>> moves;
     for (int r = 0; r < 10; r++) {
         for (int c = 0; c < 10; c++) {
-            if (board[r][c] != HIT && board[r][c] != MISS) {
+            if (!bombed(board, r, c)) {
                 moves.push_back({ r, c });
             }
         }
@@ -456,16 +459,21 @@ double UCB(MCTSNode* node) {
     return exploitation + exploration;
 }
 
+bool bombed(char board[10][10], int row, int col)
+{
+    return (board[row][col] == HIT || board[row][col] == MISS);
+}
+
 // Hunt and Target
 void huntAndTarget(char board[10][10], int row, int col)
 {
-    if (applyMove(board, row - 1, col))
+    if (!bombed(board, row - 1, col) && applyMove(board, row - 1, col))
         huntAndTarget(board, row - 1, col);
-    else if (applyMove(board, row + 1, col))
+    else if (!bombed(board, row + 1, col) && applyMove(board, row + 1, col))
         huntAndTarget(board, row + 1, col);
-    else if (applyMove(board, row, col - 1))
+    else if (!bombed(board, row, col - 1) && applyMove(board, row, col - 1))
         huntAndTarget(board, row, col - 1);
-    else if (applyMove(board, row, col + 1))
+    else if (!bombed(board, row, col + 1) && applyMove(board, row, col + 1))
         huntAndTarget(board, row, col + 1);
 
     return;
