@@ -93,6 +93,8 @@ double UCB(MCTSNode* node); // Our UCB Score For Child Node Selection
 
 void parallelSimulation(vector<MCTSNode*>& nodes);
 
+void huntAndTarget(char board[10][10], int row, col); // "Lock on" to a HIT space and scan around it
+
 //// MAIN Function ////
 
 int main() {
@@ -452,4 +454,19 @@ double UCB(MCTSNode* node) {
     double exploitation = node->wins / (double)node->visits;
     double exploration = sqrt(2.0 * log((double)node->parent->visits) / (double)node->visits);
     return exploitation + exploration;
+}
+
+// Hunt and Target
+void huntAndTarget(char board[10][10], int row, int col)
+{
+    if (applyMove(board, row - 1, col))
+        huntAndTarget(board, row - 1, col);
+    else if (applyMove(board, row + 1, col))
+        huntAndTarget(board, row + 1, col);
+    else if (applyMove(board, row, col - 1))
+        huntAndTarget(board, row, col - 1);
+    else if (applyMove(board, row, col + 1))
+        huntAndTarget(board, row, col + 1);
+
+    return;
 }
