@@ -85,7 +85,7 @@ double UCB(MCTSNode* node);       // Calculate UCB score for node
 
 // Parallel simulation and extra functions
 void parallelSimulation(vector<MCTSNode*>& nodes);
-bool bombed(char board[BOARD_SIZE][BOARD_SIZE], int row, int col); // Check if the space was bombed
+bool bombed(const char board[BOARD_SIZE][BOARD_SIZE], int row, int col); // Check if the space was bombed
 void huntAndTarget(char board[BOARD_SIZE][BOARD_SIZE], int row, int col); // Lock on to a HIT space and scan around it
 
 //// MAIN Function ////
