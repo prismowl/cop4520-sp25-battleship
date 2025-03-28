@@ -407,13 +407,17 @@ void deleteTree(MCTSNode* root) {
 
 // Run MCTS iterations (selection, expansion, simulation, backpropagation)
 MCTSNode* runMCTSPhases(char board[BOARD_SIZE][BOARD_SIZE]) {
-
     //get all possible moves from the board that are not bombed yet
     vector<pair<int, int>> moves = getPossibleMoves(board);
+    
+    // shuffle at start
+    mt19937 rng(random_device{}());
+    shuffle(moves.begin(), moves.end(), rng);
+    
+    // Create candidate nodes for each possible move in a randomized order.
     vector<MCTSNode*> possible_moves;
-
-    //create nodes for each move in tree
-    for (auto& m : moves) {
+     //create nodes for each move in tree
+     for (auto& m : moves) {
         //create new node
         MCTSNode* child = new MCTSNode();
         //copy current board state
@@ -462,7 +466,6 @@ MCTSNode* runMCTSPhases(char board[BOARD_SIZE][BOARD_SIZE]) {
         });
     }
 
-
     //join threads
     for (auto& t : threads) t.join();
 
@@ -483,7 +486,6 @@ MCTSNode* runMCTSPhases(char board[BOARD_SIZE][BOARD_SIZE]) {
     }
     return best;
 }
-
 
 
 int main() {
