@@ -88,41 +88,6 @@ void parallelSimulation(vector<MCTSNode*>& nodes);
 bool bombed(const char board[BOARD_SIZE][BOARD_SIZE], int row, int col); // Check if the space was bombed
 void huntAndTarget(char board[BOARD_SIZE][BOARD_SIZE], int row, int col); // Lock on to a HIT space and scan around it
 
-//// MAIN Function ////
-
-int main() {
-    // For now we use a predefined board configuration for testing
-    char boardPlayer1[BOARD_SIZE][BOARD_SIZE] = {
-        {'~', '~', '~', '~', '~', '~', '~', 'S', 'S', '~'},
-        {'~', '~', '~', '~', '~', '~', '~', '~', '~', '~'},
-        {'~', '~', '~', '~', '~', '~', '~', '~', '~', '~'},
-        {'~', '~', 'S', 'S', 'S', 'S', 'S', '~', '~', '~'},
-        {'~', '~', '~', '~', '~', '~', '~', '~', '~', '~'},
-        {'~', '~', '~', '~', '~', '~', 'S', '~', '~', '~'},
-        {'~', 'S', '~', '~', '~', '~', 'S', '~', '~', 'S'},
-        {'~', 'S', '~', '~', '~', '~', 'S', '~', '~', 'S'},
-        {'~', 'S', '~', '~', '~', '~', 'S', '~', '~', 'S'},
-        {'~', '~', '~', '~', '~', '~', '~', '~', '~', '~'}
-    };
-
-    printBoard(boardPlayer1, player1); // Print initial board
-
-    auto start = chrono::high_resolution_clock::now(); // Start timing
-    monteCarloTreeSearch(boardPlayer1);               // Run the MCTS Battleship algorithm
-    auto end = chrono::high_resolution_clock::now();   // End timing
-    auto result = chrono::duration_cast<chrono::milliseconds>(end - start);
-
-    cout << "MCTS AI has finished searching for ships!" << endl;
-    cout << "All ships found. AI wins!" << endl;
-    cout << "Amount of moves: " << moveAmount << endl; 
-    cout << "Time Result: " << result.count() << " ms" << endl;
-    cout << "Time Result: " << (result.count() / 1000) << " s" << endl << endl;
-
-    printBoard(boardPlayer1, player1); // Print the final board
-
-    return 0;
-}
-
 //// Function Definitions ////
 
 // Initialize the board with WATER characters
@@ -135,22 +100,18 @@ void initializeBoard(char playerBoard[BOARD_SIZE][BOARD_SIZE]) {
 }
 
 // Print the board with row and column labels
-void printBoard(char board[BOARD_SIZE][BOARD_SIZE], int playerNumber) {
-    cout << "\tPlayer " << playerNumber << " Board\n\n";
-    cout << "   ";
-    for (int col = 0; col < BOARD_SIZE; col++) {
-        cout << (char)('A' + col) << "  ";
-    }
-    cout << endl;
-    for (int row = 0; row < BOARD_SIZE; row++) {
-        cout << (row + 1) << ((row < 9) ? "  " : " ");
-        for (int col = 0; col < BOARD_SIZE; col++) {
-            cout << board[row][col] << "  ";
-        }
-        cout << endl;
+void printBoard(const char board[BOARD_SIZE][BOARD_SIZE]) {
+    cout << "\n   ";
+    for (int c = 0; c < BOARD_SIZE; ++c) cout << (char)('A' + c) << ' ';
+    cout << '\n';
+    for (int r = 0; r < BOARD_SIZE; ++r) {
+        cout << (r + 1 < 10 ? " " : "") << r + 1 << ' ';
+        for (int c = 0; c < BOARD_SIZE; ++c) cout << board[r][c] << ' ';
+        cout << '\n';
     }
     cout << endl;
 }
+
 
 // Run multiple simulations in parallel
 void parallelSimulation(vector<MCTSNode*>& nodes) {
@@ -178,6 +139,7 @@ void parallelSimulation(vector<MCTSNode*>& nodes) {
 // Main MCTS routine: search until game is over
 void monteCarloTreeSearch(char playerBoard[BOARD_SIZE][BOARD_SIZE]) {
     while (!isGameOver(playerBoard)) {
+        printBoard(playerBoard);
         // Create root node with current board state
         MCTSNode* root = new MCTSNode();
         copyBoard(playerBoard, root->boardState);
@@ -205,7 +167,7 @@ void monteCarloTreeSearch(char playerBoard[BOARD_SIZE][BOARD_SIZE]) {
         // Clean up the tree
         deleteTree(root);
 
-        printBoard(playerBoard, player1); // Debug: show current board
+        printBoard(playerBoard); // Debug: show current board
 
         moveAmount++; // Increment move counter
     }
@@ -333,26 +295,27 @@ bool isGameOver(const char board[BOARD_SIZE][BOARD_SIZE]) {
 // Get all possible moves: cells not yet bombed (not HIT or MISS)
 vector<pair<int, int>> getPossibleMoves(const char board[BOARD_SIZE][BOARD_SIZE]) {
     vector<pair<int, int>> moves;
-    for (int r = 0; r < BOARD_SIZE; r++) {
-        for (int c = 0; c < BOARD_SIZE; c++) {
-            if (!bombed(board, r, c)) {
-                moves.push_back({ r, c });
-            }
-        }
-    }
+    for (int r = 0; r < BOARD_SIZE; ++r)
+        for (int c = 0; c < BOARD_SIZE; ++c)
+            //direct comparison here. Calling bombed was creating overhead slowing run
+            if (board[r][c] != HIT && board[r][c] != MISS)
+                moves.emplace_back(r, c);
     return moves;
 }
 
 // Apply a move: mark HIT if ship exists, else mark MISS
 bool applyMove(char board[BOARD_SIZE][BOARD_SIZE], int row, int col) {
-    if (board[row][col] == SHIP) {
+    //this way board is only evalutated once.
+    //attempt for better formance
+    bool hit = board[row][col] == SHIP;
+    if (hit) {
         board[row][col] = HIT;
-        return true;
     } else {
         board[row][col] = MISS;
-        return false;
     }
+    return hit;
 }
+
 
 // Copy the board state from source to destination
 void copyBoard(const char src[BOARD_SIZE][BOARD_SIZE], char dest[BOARD_SIZE][BOARD_SIZE]) {
@@ -376,19 +339,44 @@ double UCB(MCTSNode* node) {
     return exploitation + exploration;
 }
 
-// Check if the given cell has already been bombed
-bool bombed(char board[BOARD_SIZE][BOARD_SIZE], int row, int col) {
-    return (board[row][col] == HIT || board[row][col] == MISS);
-}
+// // Check if the given cell has already been bombed
+// bool bombed(char board[BOARD_SIZE][BOARD_SIZE], int row, int col) {
+//     return (board[row][col] == HIT || board[row][col] == MISS);
+// }
 
-void huntAndTarget(char board[BOARD_SIZE][BOARD_SIZE], int row, int col) {
-    if (row > 0 && !bombed(board, row - 1, col) && applyMove(board, row - 1, col))
-        huntAndTarget(board, row - 1, col);
-    if (row < BOARD_SIZE - 1 && !bombed(board, row + 1, col) && applyMove(board, row + 1, col))
-        huntAndTarget(board, row + 1, col);
-    if (col > 0 && !bombed(board, row, col - 1) && applyMove(board, row, col - 1))
-        huntAndTarget(board, row, col - 1);
-    if (col < BOARD_SIZE - 1 && !bombed(board, row, col + 1) && applyMove(board, row, col + 1))
-        huntAndTarget(board, row, col + 1);
-    return;
+// void huntAndTarget(char board[BOARD_SIZE][BOARD_SIZE], int row, int col) {
+//     if (row > 0 && !bombed(board, row - 1, col) && applyMove(board, row - 1, col))
+//         huntAndTarget(board, row - 1, col);
+//     if (row < BOARD_SIZE - 1 && !bombed(board, row + 1, col) && applyMove(board, row + 1, col))
+//         huntAndTarget(board, row + 1, col);
+//     if (col > 0 && !bombed(board, row, col - 1) && applyMove(board, row, col - 1))
+//         huntAndTarget(board, row, col - 1);
+//     if (col < BOARD_SIZE - 1 && !bombed(board, row, col + 1) && applyMove(board, row, col + 1))
+//         huntAndTarget(board, row, col + 1);
+//     return;
+// }
+
+int main() {
+    char board[BOARD_SIZE][BOARD_SIZE] = {
+        {'~', 'S', '~', '~', '~', '~', '~', '~', '~', '~'},
+        {'~', 'S', '~', '~', '~', '~', '~', '~', '~', '~'},
+        {'~', 'S', '~', 'S', 'S', 'S', 'S', '~', '~', '~'},
+        {'~', 'S', '~', '~', '~', '~', '~', '~', '~', '~'},
+        {'~', 'S', '~', 'S', '~', '~', 'S', 'S', 'S', '~'},
+        {'~', '~', '~', 'S', '~', '~', '~', '~', '~', '~'},
+        {'~', '~', '~', 'S', '~', '~', '~', '~', '~', '~'},
+        {'~', '~', '~', '~', '~', '~', '~', '~', '~', '~'},
+        {'~', '~', '~', '~', '~', '~', '~', 'S', 'S', '~'},
+        {'~', '~', '~', '~', '~', '~', '~', '~', '~', '~'}
+    };
+
+    auto start = chrono::high_resolution_clock::now();
+    monteCarloTreeSearch(board);
+    auto end = chrono::high_resolution_clock::now();
+    auto duration = chrono::duration_cast<chrono::milliseconds>(end - start);
+
+    cout << "Game completed in " << moveAmount << " AI moves." << endl;
+    cout << "Time: " << duration.count() << " ms" << endl;
+
+    return 0;
 }
