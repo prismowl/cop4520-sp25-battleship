@@ -67,7 +67,7 @@ void printBoard(char board[BOARD_SIZE][BOARD_SIZE], int playerNumber); // Print 
 
 // Monte Carlo Search Tree Functions 
 void monteCarloTreeSearch(char playerBoard[BOARD_SIZE][BOARD_SIZE]); // Run the MCTS
-MCTSNode* runMCTSPhases(MCTSNode* root); // Execute selection, expansion, simulation, backpropagation
+MCTSNode* runMCTSPhases(char board[BOARD_SIZE][BOARD_SIZE]); // Execute selection, expansion, simulation, backpropagation
 
 // MCTS Phases
 MCTSNode* selection(MCTSNode* node); // Select a child by its UCB score
@@ -76,16 +76,16 @@ double simulation(MCTSNode* node);     // Simulate a random playout from current
 void backpropagation(MCTSNode* node, double result); // Update the tree with simulation result
 
 // Helper Functions
-bool isGameOver(const char board[BOARD_SIZE][BOARD_SIZE]);  // Check if any ship remains
-vector<pair<int, int>> getPossibleMoves(const char board[BOARD_SIZE][BOARD_SIZE]); // Get all legal moves
+bool isGameOver(char board[BOARD_SIZE][BOARD_SIZE]);  // Check if any ship remains
+vector<pair<int, int>> getPossibleMoves(char board[BOARD_SIZE][BOARD_SIZE]); // Get all legal moves
 bool applyMove(char board[BOARD_SIZE][BOARD_SIZE], int row, int col); // Apply a move to the board
-void copyBoard(const char source[BOARD_SIZE][BOARD_SIZE], char dest[BOARD_SIZE][BOARD_SIZE]); // Copy board state
+void copyBoard(char source[BOARD_SIZE][BOARD_SIZE], char dest[BOARD_SIZE][BOARD_SIZE]); // Copy board state
 void deleteTree(MCTSNode* root);  // Clean up tree memory
 double UCB(MCTSNode* node);       // Calculate UCB score for node
 
 // Parallel simulation and extra functions
 void parallelSimulation(vector<MCTSNode*>& nodes);
-bool bombed(const char board[BOARD_SIZE][BOARD_SIZE], int row, int col); // Check if the space was bombed
+bool bombed(char board[BOARD_SIZE][BOARD_SIZE], int row, int col); // Check if the space was bombed
 void huntAndTarget(char board[BOARD_SIZE][BOARD_SIZE], int row, int col); // Lock on to a HIT space and scan around it
 
 //// Function Definitions ////
@@ -100,7 +100,7 @@ void initializeBoard(char playerBoard[BOARD_SIZE][BOARD_SIZE]) {
 }
 
 // Print the board with row and column labels
-void printBoard(const char board[BOARD_SIZE][BOARD_SIZE]) {
+void printBoard(char board[BOARD_SIZE][BOARD_SIZE]) {
     cout << "\n   ";
     for (int c = 0; c < BOARD_SIZE; ++c) cout << (char)('A' + c) << ' ';
     cout << '\n';
@@ -137,81 +137,99 @@ void parallelSimulation(vector<MCTSNode*>& nodes) {
 }
 
 // Main MCTS routine: search until game is over
-void monteCarloTreeSearch(char playerBoard[BOARD_SIZE][BOARD_SIZE]) {
-    while (!isGameOver(playerBoard)) {
-        printBoard(playerBoard);
-        // Create root node with current board state
-        MCTSNode* root = new MCTSNode();
-        copyBoard(playerBoard, root->boardState);
-        root->terminal = isGameOver(root->boardState);
-
-        if (root->terminal) {
-            delete root;
-            break;
-        }
-
-        // Expand root to create children nodes
-        expansion(root);
-
-        // Run MCTS iterations to choose the best move
-        MCTSNode* bestChild = runMCTSPhases(root);
-
-        if (!bestChild) {
-            deleteTree(root);
-            break;
-        }
-
-        // Apply the chosen move
-        applyMove(playerBoard, bestChild->moveRow, bestChild->moveCol);
-
-        // Clean up the tree
-        deleteTree(root);
-
-        printBoard(playerBoard); // Debug: show current board
-
-        moveAmount++; // Increment move counter
+void monteCarloTreeSearch(char board[BOARD_SIZE][BOARD_SIZE]) {
+    while (!isGameOver(board)) {
+        printBoard(board);
+        if (isGameOver(board)) break;
+        cout << "\nAI's turn...\n";
+        MCTSNode* bestMove = runMCTSPhases(board);
+        if (!bestMove) break;
+        applyMove(board, bestMove->moveRow, bestMove->moveCol);
+        moveAmount++;
+        deleteTree(bestMove);
     }
+    printBoard(board);
 }
 
 // Run MCTS iterations (selection, expansion, simulation, backpropagation)
-MCTSNode* runMCTSPhases(MCTSNode* root) {
-    for (int i = 0; i < MCTS_ITERATIONS; i++) {
-        MCTSNode* current = root;
+MCTSNode* runMCTSPhases(char board[BOARD_SIZE][BOARD_SIZE]) {
 
-        // Selection phase: traverse to a promising node
-        while (!current->children.empty() && !current->terminal) {
-            current = selection(current);
-        }
+    //get all possible moves from the board that are not bombed yet
+    vector<pair<int, int>> moves = getPossibleMoves(board);
+    vector<MCTSNode*> possible_moves;
 
-        // Expansion phase: if node is not terminal, expand it
-        if (!current->terminal) {
-            if (current->children.empty()) {
-                expansion(current);
-            }
-            if (!current->children.empty()) {
-                static mt19937 rng(random_device{}());
-                uniform_int_distribution<int> dist(0, (int)current->children.size() - 1);
-                current = current->children[dist(rng)];
-            }
-        }
-
-        // Simulation phase: run simulations in parallel on children
-        parallelSimulation(current->children);
+    //create nodes for each move in tree
+    for (auto& m : moves) {
+        //create new node
+        MCTSNode* child = new MCTSNode();
+        //copy current board state
+        copyBoard(board, child->boardState);
+        //applies move
+        applyMove(child->boardState, m.first, m.second);
+        //keep track of row and column index of the move
+        child->moveRow = m.first;
+        child->moveCol = m.second;
+        //add move to list
+        possible_moves.push_back(child);
     }
 
+    //determine num of threads hardware can use and create vector
+    const int num_threads = thread::hardware_concurrency();
+    // num of iterations for each node
+    const int num_possible_nodes = possible_moves.size();
+    int iter_per_node = MCTS_ITERATIONS / num_possible_nodes;
+    // reserve some threads to avoid reallocation mess
+    vector<thread> threads;
+    threads.reserve(num_threads);
+
+    for (int t = 0; t < num_threads; ++t) {
+        threads.emplace_back([&, t, iter_per_node]() {
+            // give thread random num instance
+            static thread_local mt19937 rng(random_device{}());
+            //distribute nodes to threads
+            for (size_t i = t; i < possible_moves.size(); i += num_threads) {
+                MCTSNode* child_node = possible_moves[i];
+                //run num of iterations
+                for (int iter = 0; iter < iter_per_node; ++iter) {
+                    MCTSNode* current = child_node;
+                    //expand node
+                    expansion(current);
+                    if (!current->children.empty()) {
+                        //choose random move child
+                        uniform_int_distribution<int> dist(0, (int)current->children.size() - 1);
+                        current = current->children[dist(rng)];
+                    }
+                    //run simulation on current node
+                    double result = simulation(current);
+                    //update tree
+                    backpropagation(current, result);    
+                }
+            }
+        });
+    }
+
+
+    //join threads
+    for (auto& t : threads) t.join();
+
+    //find best node based on winrate
+    MCTSNode* best = nullptr;
     double bestRate = -1.0;
-    MCTSNode* bestChild = nullptr;
-    for (auto* child : root->children) {
-        if (child->visits > 0) {
-            double rate = child->wins / (double)child->visits;
+    for (auto* c : possible_moves) {
+        //only nodes that were visited
+        if (c->visits > 0) {
+            //win rate
+            double rate = c->wins / c->visits;
+            //update best rate if new best is found
             if (rate > bestRate) {
                 bestRate = rate;
-                bestChild = child;
+                best = c;
             }
         }
     }
-    return bestChild;
+    return best;
 }
+
 
 // Selection: choose the child with the highest UCB score
 MCTSNode* selection(MCTSNode* node) {
@@ -283,7 +301,7 @@ void backpropagation(MCTSNode* node, double result) {
 }
 
 // Check if any ship ('S') remains on the board
-bool isGameOver(const char board[BOARD_SIZE][BOARD_SIZE]) {
+bool isGameOver(char board[BOARD_SIZE][BOARD_SIZE]) {
     for (int r = 0; r < BOARD_SIZE; r++) {
         for (int c = 0; c < BOARD_SIZE; c++) {
             if (board[r][c] == SHIP) return false;
@@ -293,7 +311,7 @@ bool isGameOver(const char board[BOARD_SIZE][BOARD_SIZE]) {
 }
 
 // Get all possible moves: cells not yet bombed (not HIT or MISS)
-vector<pair<int, int>> getPossibleMoves(const char board[BOARD_SIZE][BOARD_SIZE]) {
+vector<pair<int, int>> getPossibleMoves(char board[BOARD_SIZE][BOARD_SIZE]) {
     vector<pair<int, int>> moves;
     for (int r = 0; r < BOARD_SIZE; ++r)
         for (int c = 0; c < BOARD_SIZE; ++c)
@@ -318,7 +336,7 @@ bool applyMove(char board[BOARD_SIZE][BOARD_SIZE], int row, int col) {
 
 
 // Copy the board state from source to destination
-void copyBoard(const char src[BOARD_SIZE][BOARD_SIZE], char dest[BOARD_SIZE][BOARD_SIZE]) {
+void copyBoard(char src[BOARD_SIZE][BOARD_SIZE], char dest[BOARD_SIZE][BOARD_SIZE]) {
     memcpy(dest, src, sizeof(char) * BOARD_SIZE * BOARD_SIZE);
 }
 
