@@ -62,7 +62,6 @@ int MCTS_ITERATIONS = 200; // Number of iterations to run the MCTS
 //// Function Declarations ////
 
 // Board Functions 
-void initializeBoard(char playerBoard[BOARD_SIZE][BOARD_SIZE]);  // Initialize board with WATER
 void printBoard(char board[BOARD_SIZE][BOARD_SIZE], int playerNumber); // Print board
 
 // Monte Carlo Search Tree Functions 
@@ -89,16 +88,6 @@ bool bombed(char board[BOARD_SIZE][BOARD_SIZE], int row, int col); // Check if t
 void huntAndTarget(char board[BOARD_SIZE][BOARD_SIZE], int row, int col); // Lock on to a HIT space and scan around it
 
 //// Function Definitions ////
-
-// Initialize the board with WATER characters
-void initializeBoard(char playerBoard[BOARD_SIZE][BOARD_SIZE]) {
-    for (int i = 0; i < BOARD_SIZE; i++) {
-        for (int j = 0; j < BOARD_SIZE; j++) {
-            playerBoard[i][j] = WATER;
-        }
-    }
-}
-
 // Print the board with row and column labels
 void printBoard(char board[BOARD_SIZE][BOARD_SIZE]) {
     cout << "\n   ";
@@ -248,17 +237,15 @@ MCTSNode* selection(MCTSNode* node) {
 // Expansion: generate a child for every possible move
 void expansion(MCTSNode* node) {
     if (node->terminal) return;
-    vector<pair<int, int>> moves = getPossibleMoves(node->boardState);
+    auto moves = getPossibleMoves(node->boardState);
     for (auto& m : moves) {
-        int r = m.first;
-        int c = m.second;
         MCTSNode* child = new MCTSNode();
-        child->parent = node;
         copyBoard(node->boardState, child->boardState);
-        applyMove(child->boardState, r, c);
-        child->moveRow = r;
-        child->moveCol = c;
+        applyMove(child->boardState, m.first, m.second);
+        child->moveRow = m.first;
+        child->moveCol = m.second;
         child->terminal = isGameOver(child->boardState);
+        child->parent = node;
         node->children.push_back(child);
     }
 }
@@ -292,11 +279,12 @@ double simulation(MCTSNode* node) {
 
 // Backpropagation: update nodes with simulation result
 void backpropagation(MCTSNode* node, double result) {
-    MCTSNode* current = node;
-    while (current != nullptr) {
-        current->visits++;
-        current->wins += result;
-        current = current->parent;
+    //continue iteration as long as theres nodes to go to
+    while (node) {
+        node->visits++;
+        node->wins += result;
+        //move up to pareent node
+        node = node->parent;
     }
 }
 
@@ -343,9 +331,7 @@ void copyBoard(char src[BOARD_SIZE][BOARD_SIZE], char dest[BOARD_SIZE][BOARD_SIZ
 
 // Delete the MCTS tree to free memory
 void deleteTree(MCTSNode* root) {
-    for (MCTSNode* child : root->children) {
-        deleteTree(child);
-    }
+    for (auto* c : root->children) deleteTree(c);
     delete root;
 }
 
