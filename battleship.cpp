@@ -85,7 +85,7 @@ double UCB(MCTSNode* node);       // Calculate UCB score for node
 
 // Parallel simulation and extra functions
 void parallelSimulation(vector<MCTSNode*>& nodes);
-bool bombed(char board[BOARD_SIZE][BOARD_SIZE], int row, int col); // Check if the space was bombed
+bool bombed(const char board[BOARD_SIZE][BOARD_SIZE], int row, int col); // Check if the space was bombed
 void huntAndTarget(char board[BOARD_SIZE][BOARD_SIZE], int row, int col); // Lock on to a HIT space and scan around it
 
 //// MAIN Function ////
@@ -355,13 +355,10 @@ bool applyMove(char board[BOARD_SIZE][BOARD_SIZE], int row, int col) {
 }
 
 // Copy the board state from source to destination
-void copyBoard(const char source[BOARD_SIZE][BOARD_SIZE], char dest[BOARD_SIZE][BOARD_SIZE]) {
-    for (int r = 0; r < BOARD_SIZE; r++) {
-        for (int c = 0; c < BOARD_SIZE; c++) {
-            dest[r][c] = source[r][c];
-        }
-    }
+void copyBoard(const char src[BOARD_SIZE][BOARD_SIZE], char dest[BOARD_SIZE][BOARD_SIZE]) {
+    memcpy(dest, src, sizeof(char) * BOARD_SIZE * BOARD_SIZE);
 }
+
 
 // Delete the MCTS tree to free memory
 void deleteTree(MCTSNode* root) {
