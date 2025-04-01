@@ -18,7 +18,7 @@ Ensure you have a C++ compiler installed. If you don't have one, follow these st
 Navigate to the directory src containing `battleship.cpp` and compile using:
 
 ```sh
-g++ battleship.cpp -o battleship.cpp
+g++ battleship.cpp -o battleship
 ```
 
 ## Running the Program
