@@ -18,7 +18,7 @@ Ensure you have a C++ compiler installed. If you don't have one, follow these st
 Navigate to the directory src containing `battleship.cpp` and compile using:
 
 ```sh
-g++ -o battleship.exe battleship.cpp -std=c++17
+g++ battleship.cpp -o battleship.cpp
 ```
 
 ## Running the Program
@@ -26,7 +26,7 @@ g++ -o battleship.exe battleship.cpp -std=c++17
 After successful compilation, run the program:
 
 ```sh
-./battleship.exe
+./battleship
 ```
 
 ## Cleaning Up
@@ -34,7 +34,7 @@ After successful compilation, run the program:
 To remove the compiled binary:
 
 ```sh
-del battleship.exe
+del battleship
 ```
 
 ## Additional Notes
